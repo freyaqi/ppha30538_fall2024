@@ -1,0 +1,380 @@
+---
+title: "Pset 1"
+author: "Yuan Qi"
+date: "2024-10-5"
+format: 
+  html: 
+    code-overlap: wrap
+execute:
+  eval: true
+  echo: true
+---
+
+1. **PS1:** Due Sat Oct 5 at 5:00PM Central. Worth 50 points. 
+
+We use (`*`) to indicate a problem that we think might be time consuming. 
+
+Steps to submit (5 points on PS1)
+
+1. "This submission is my work alone and complies with the 30538 integrity
+policy." Add your initials to indicate your agreement: \*\*\Y\Q\*\*
+
+2. "I have uploaded the names of anyone I worked with on the problem set **[here](https://docs.google.com/forms/d/1-zzHx762odGlpVWtgdIC55vqF-j3gqdAp6Pno1rIGK0/edit)**"  \*\*\Y\Q\*\* (1 point)
+3. Late coins used this pset: \*\*\Y\Q\*\* Late coins left after submission: \*\*3*\*
+4. Knit your `ps1.qmd`to HTML 
+5. Convert your HTML to PDF by printing to PDF from a browser.
+6. Submit resulting ps1.pdf to Gradescope (4 points) 
+7. Tag your submission in Gradescope
+
+
+```{python}
+# set up 
+import pandas as pd
+import altair as alt
+import altair_saver as saver
+import time
+import os
+import math
+import warnings 
+warnings.filterwarnings('ignore')
+alt.data_transformers.disable_max_rows()
+```
+
+
+## Read in one percent sample (15 Points)
+
+1.  
+```{python}
+# set a starting time
+starting_time = time.time()
+
+# read the cvs.file
+file_path = r"C:\Users\freya\Desktop\24 fall study\Python2\Pset1\parking_tickets_one_percent.csv"
+pt = pd.read_csv(file_path)
+
+# set an ending time
+ending_time = time.time()
+
+# calculate the time used for reading the file
+time_duration = ending_time - starting_time
+print(f"The time taken for reading the file is {time_duration:4f}seconds")
+
+# add an assert statement to verify the number of the rows
+number_rows = len(pt)
+if number_rows == 287458:
+    print("The number of rows is correctly to be 287458")
+else:
+    print(f"The number of rows is expected to be 287458, but it is actually {number_rows}")
+```
+
+2. 
+```{python}
+# Calculate the size of sample data in MB
+file_path = r"C:\Users\freya\Desktop\24 fall study\Python2\Pset1\parking_tickets_one_percent.csv"
+size_sample_bytes = os.path.getsize(file_path)
+size_sample_mb = size_sample_bytes/(240*240)
+
+# Calculate the size of full data in MB
+size_fulldata_mb = size_sample_mb*100
+
+#Print the result
+print(f"The size of the sample data in megabytes is {size_sample_mb:4f}MB")
+print(f"The size of the full data in megabytes is{size_fulldata_mb:4f}MB.")
+```
+
+3. 
+```{python}
+# Convert the type of all date columns to numeric
+pt['issue_date'] = pd.to_datetime(pt['issue_date'])
+pt['ticket_queue_date'] = pd.to_datetime(pt['ticket_queue_date'])
+
+# Filter the first 500 rows as a subset
+subset_pt = pt.iloc[:500,:]
+
+# Define a function to test if the data is ordered by a column
+def test_column_ordered(dataframe):
+    ordered_columns = {}
+
+    for column in dataframe.columns:
+        if (pd.api.types.is_numeric_dtype(dataframe[column]) or
+        pd.api.types.is_datetime64_any_dtype(dataframe[column])):
+            ascending = dataframe[column].is_monotonic_increasing
+            descending = dataframe[column].is_monotonic_decreasing
+
+            if ascending:
+                ordered_columns[column] = "Ascending"
+            elif descending:
+                ordered_columns[column] = "Descending"
+            else:
+                ordered_columns[column] = "Not ordered"
+        else:
+            ordered_columns[column] = "Non numeric or not sortable"
+
+    return ordered_columns
+
+# Check if the subset is ordered by which column
+test_result = test_column_ordered(subset_pt) 
+
+# Print all the test result
+for column, order in test_result.items():
+    print(f"column '{column}':{order}")
+```
+
+So, the data is ascending ordered by the column "issue_date".
+
+
+
+## Cleaning the data and benchmarking (15 Points)
+
+### 1.  
+```{python}
+# Calculate the tickets issued in the sample data in 2017 
+tickets_2017 = pt[pt['issue_date'].dt.year == 2017]
+print(f"The tickets issued in the sample data in 2017 is {len(tickets_2017)}")
+
+# Calculate the tickets issued in the full data in 2017
+# Based on the fact that the sample data is one percent
+print(f"The tickets issued in the full data in 2017 is {len(tickets_2017)*100}")
+```
+From an academic research perspective, the difference of 3 million is statistically significant. Such a discrepancy could introduce bias in further studies, potentially leading to inaccurate conclusions.
+
+However, this difference may stem from the scope of the data. For example, ProPublica might have considered multi-year averages rather than focusing solely on 2017. Alternatively, differences in data collection and calculation methods, such as accounting for missing or polluted data, could also explain the variation. This discrepancy doesn't necessarily imply that one source is wrong, but it highlights the potential for variation. Nonetheless, both figures indicate that Chicago issues a substantial number of tickets annually.
+
+### 2. 
+```{python}
+# Calculate the frequency of the violation types
+violation_counts = pt['violation_description'].value_counts()
+
+# Pool the top 20 violation types
+top_20_violations = violation_counts.head(20)
+
+# Convert the series to dataframe
+top_20_violations_df = pd.DataFrame({
+    'violation_description': top_20_violations.index,
+    'violation_frequency': top_20_violations.values
+})
+
+# Plot the bar gragh of the top 20 violation types
+chart0 = alt.Chart(top_20_violations_df).mark_bar().encode(
+    x=alt.X('violation_description:N', sort='-y', title='Violation Type',
+    axis=alt.Axis(labelAngle=45, labelFontSize=7)),
+    y=alt.Y('violation_frequency:Q', title='Violation Frequency'),
+    tooltip=['violation_description', 'violation_frequency']
+).properties(
+    title='Top 20 Most Violation Types',
+    width=1000,
+    height=400
+).configure_title(
+    fontSize=16,
+    fontWeight='bold'
+)
+
+# Display and save the plot
+chart0.show()
+chart0.save(r'C:\Users\freya\Desktop\24 fall study\Python2\Pset1\Top_20_Violation_Types.png')
+```
+
+
+
+## Visual Encoding (15 Points)
+
+### 1. 
+```{python}
+# Set a function to reflect the datatype of pandas to altair
+def map_dtype_altair(pandas_dtype,column_name):
+    if pandas_dtype =='int64':
+        return 'Quantative or Ordinal'
+    elif pandas_dtype == 'float64':
+        return 'Quantative'
+    elif pandas_dtype == 'datetime64[ns]':
+        return 'Temporal and Ordinal'
+    elif pandas_dtype == 'object':
+        return 'Norminal'
+    else:
+        return 'unkown'
+
+# Test all the columns in the sample data
+columns = pt.columns
+altair_dtypes = [map_dtype_altair(pt[col].dtype,col) for col in columns]
+
+# Show the results using a dataframe
+data_types = pd.DataFrame({
+    'Column Name': columns,
+    'Data Type': altair_dtypes
+})
+print(data_types)
+```
+
+**Explanation: 
+1) "issue_date" and "ticket_queue_date" are time data, so they are Temporal, but they can also be ordered, so they are also Ordinal.
+2) int number can be quantative or ordinal, it depends. In this case, "fine_level_1_amount" and "fine_level2_amount" are quantative.
+
+### 2. 
+```{python}
+# Delete the row with missing data in the column "vehicle_make" and "paid"
+pt_filtered = pt.dropna(subset=['vehicle_make','ticket_queue'])
+
+# Calculate the fraction of tickets paid to each vehicle make
+total_tickets = pt_filtered.groupby('vehicle_make')['ticket_queue'].count()
+paid_tickets = pt_filtered[pt_filtered['ticket_queue']=='Paid'].groupby('vehicle_make')['ticket_queue'].count()
+paid_fraction = (paid_tickets/total_tickets).fillna(0)
+
+# Convert the series to dataframe 
+paid_fraction = paid_fraction.reset_index()
+paid_fraction.columns = ['vehicle_make', 'paid']
+paid_fraction['paid'] = paid_fraction['paid'].astype(float)
+
+# Print the paid_fraction dataframe
+print(paid_fraction)
+
+# Make a graph using altair to show the results
+chart1 = alt.Chart(paid_fraction).mark_bar().encode(
+    x = alt.X('vehicle_make:N',title = 'vehicle make',sort = '-y'),
+    y = alt.Y('paid:Q',title = 'Fraction of Tickets Paid') 
+).properties(
+    title = 'Fraction of Tickets Paid by Vehicle Make'
+)
+
+# Display and save the plot
+chart1.show()
+chart1.save(r'C:\Users\freya\Desktop\24 fall study\Python2\Pset1\violation_chart.png')
+```
+The financial situations of vehicle owners vary significantly across different vehicle makes. As illustrated in the graph, luxury vehicle makes tend to have higher ticket payment rates. This is because owners of these vehicles usually have greater financial resources, allowing them to pay fines promptly to avoid legal consequences. On the other hand, owners of lower-end or more mainstream brands may be more inclined to delay or even avoid paying tickets, as they might be facing financial difficulties.
+
+Additionally, regional differences in policies and law enforcement intensity also play a role. In some areas, stricter enforcement mechanisms are in place, which encourages vehicle owners to settle their fines more quickly.
+
+### 3. 
+```{python}
+# Convert the datatype of issue_date to numeric
+pt['issue_date'] = pd.to_datetime(pt['issue_date'])
+
+# Convert the datatype of issue_date to datetime
+pt['issue_date'] = pd.to_datetime(pt['issue_date'])
+
+# Calculate the tickets issued per day
+tickets_per_day = pt.groupby(pt['issue_date'].dt.date)['ticket_number'].count().reset_index(name='ticket_count')
+tickets_per_day['issue_date'] = pd.to_datetime(tickets_per_day['issue_date'])
+
+# Make a graph using filled step chart
+chart2 = alt.Chart(tickets_per_day).mark_area(
+    color="lightblue",
+    interpolate='step-after',
+    line=True
+).encode(
+    x=alt.X('issue_date:T', title='Date'),
+    y=alt.Y('ticket_count:Q', title='Number of Tickets')
+).properties(
+    title='Number of Tickets Issued Over Time'
+)
+
+# Display and save the graph
+chart2.show()
+chart2.save(r'C:\Users\freya\Desktop\24 fall study\Python2\Pset1\Number of Tickets Issued Over Time.png')
+```
+The only visual encoding channel this graph use is XY two dimensions of the plane, as there is no z axis.
+
+### 4. 
+```{python}
+# Seperate the month and day from the issue_date
+pt['Month'] = pt['issue_date'].dt.month
+pt['Day'] = pt['issue_date'].dt.day
+
+# Group the data by the month and day
+tickets_by_day_month = pt.groupby(['Month', 'Day'])['ticket_number'].count().reset_index()
+
+# Plot the Graph according to the example online
+chart3 = alt.Chart(tickets_by_day_month, title='Numbers of Tickets Issued by Day and Month').mark_rect().encode(
+    alt.X('Day:O', title='Day'),
+    alt.Y('Month:O', title='Month'),
+    alt.Color('ticket_number:Q', title='Tickets Issued'),
+    tooltip=[
+        alt.Tooltip('Month:O', title='Month'),
+        alt.Tooltip('Day:O', title='Day'),
+        alt.Tooltip('ticket_number:Q', title='Tickets Issued')
+    ]
+).configure_view(
+    step=13,
+    strokeWidth=0
+).configure_axis(
+    domain=False
+)
+
+# Display and save the graph
+chart3.show()
+chart3.save(r'C:\Users\freya\Desktop\24 fall study\Python2\Pset1\Numbers of Tickets Issued by Day and Month.png') 
+```
+
+The visual encoding channels this graph use are XY two dimensions of the plane and color.
+
+### 5. 
+```{python}
+# Convert the datatype of issue_date
+pt['issue_date'] = pd.to_datetime(pt['issue_date'], errors='coerce')
+
+# Filter the top 5 violations data as a subset
+top_5_violations = pt['violation_description'].value_counts().nlargest(5).index.tolist()
+subset_pt = pt[pt['violation_description'].isin(top_5_violations)]
+
+# Graph according to the example online
+chart4 = alt.Chart(subset_pt, width=300, height=100).mark_rect().encode(
+    alt.X("yearmonthdate(issue_date):T")
+        .title("Time")
+        .axis(
+            format="%Y",
+            tickCount="year", 
+            labelAngle=-45,
+            labelOverlap=False,
+            grid=True 
+        ),
+    alt.Y("violation_description:N").title("Violation Type"),
+    alt.Color("count(ticket_number):Q").title("Ticket Issued")
+)
+
+# Display and save the plot
+chart4.show()
+chart4.save(r'C:\Users\freya\Desktop\24 fall study\Python2\Pset1\Top5 Violations.png')
+```
+
+The visual encoding channels this graph use are XY two dimensions of the plane and value(brightness).
+
+### 6. 
+#### **Filled Step Chart example for Q3-3:**
+
+##### **Pros:**
+1. **Effective for Temporal Trends:** The filled step chart is effective for illustrating temporal trends, making changes in the data over time easy to interpret without overwhelming the viewer with too much information.
+2. **Works Well for Continuous Data:** It works well for continuous data, such as time-series data, by smoothly displaying changes over time.
+
+##### **Cons:**
+1. **Limited Information:** It only includes an x-axis and y-axis, representing just two variables. This limits its ability to break down data by category or compare different data types.
+2. **Data Size Challenges:** With larger datasets, performance issues may arise. For instance, in the plot from Q3-3, the lines and areas become so close together that it’s difficult to clearly observe the trends.
+
+
+#### **Annual Weather Heatmap example for Q3-4:**
+##### **Pros: **
+a. Effectively visual Representation: It can effectively show how value changes across two dimensions, not only one dimension. Also, using colors to represent data makes it easy to distinguish high and low value at a glance.
+b. Summarizing well in large data size: It's a good summary for large dataset, allows users to quickly grasp the overrall trend.
+
+##### **Cons:**
+a.Color Limitations: Heavy reliance on color may make the visualization challenging for colorblind users, and subtle differences in shades can be hard to distinguish. 
+b. Over-Simplification: While it offers a high-level overview, it's hard to observe the exact numbers while not using tooltios.
+c. Not Ideal for Small Data: If the dataset is small or lacks significant variation, the heatmap can appear monotonous, offering less value.
+
+#### **Lasagna Plot Example for Q3-5**
+##### **Pros:**
+a. Comparison of Categories Over Time: This plot allows for the visualization of both the time dimension and the different categories simultaneously.
+b. Visual Intensity: The color encoding helps to quickly spot which violations are issued more frequently on certain dates. Darker or more intense colors indicate higher ticket issuance, making it easy to compare volumes visually.
+
+##### **Cons:**
+a. Complexity: The heatmap format may be less intuitive than a simple bar plot for audiences unfamiliar with heatmap visualizations.
+b. Over-Simplification: While it offers a high-level overview, it's hard to observe the exact numbers while not using tooltios.
+c. Color Limitations: Heavy reliance on color may make the visualization challenging for colorblind users, and subtle differences in shades can be hard to distinguish. 
+
+### 7. 
+The best plot for illustrating the uneven distribution of tickets issued over time is the one from Q3-4, based on the Annual Weather Heatmap example. The use of color effectively highlights the uneven distribution of tickets across different days, making it much clearer than the Filled Step Chart, which struggles to show the trend clearly due to the large dataset. 
+
+Additionally, the Lasagna Plot includes extra information, such as violation types, which might distract from the main takeaway about time-based enforcement patterns. The heatmap focuses solely on the temporal distribution, making it the most appropriate choice for this purpose.
+
+
+
+### *** Declaration for Using ChatGPT: 
+I use Chatgpt to get insights of solving some types of coding problems, and debug when there's an error but I don't know how to fix it. But I promise I didn't copy ChatGpt's coding directly.
